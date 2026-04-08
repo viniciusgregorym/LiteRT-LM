@@ -30,9 +30,9 @@ jobs:
           echo "ANDROID_NDK_HOME=$HOME/android-ndk-r26d" >> $GITHUB_ENV
 
       - name: Install Rust
-        uses: dtolnay/rust-action@master
-        with:
-          toolchain: stable
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Build litertlm_jni for Android ARM64
         run: |
