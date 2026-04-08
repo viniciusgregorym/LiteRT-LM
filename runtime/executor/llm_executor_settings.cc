@@ -169,8 +169,8 @@ absl::StatusOr<LlmExecutorSettings> LlmExecutorSettings::CreateDefault(
   // from the model assets (but note that for the model or backend which does
   // not support this, an error will be thrown during initialization).
   settings.SetMaxNumTokens(0);
-  // Disable image input by default.
-  settings.SetMaxNumImages(0);
+  // Enable 1 image input by default when vision backend is available.
+  settings.SetMaxNumImages(1);
   // Disable LoRA by default.
   settings.SetLoraRank(0);
 
