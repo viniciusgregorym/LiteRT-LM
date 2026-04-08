@@ -516,6 +516,11 @@ LITERTLM_JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateEngine)(
     settings->GetMutableMainExecutorSettings().SetMaxNumTokens(max_num_tokens);
   }
 
+  // Enable vision input when vision backend is configured.
+  if (vision_backend_optional.has_value()) {
+    settings->GetMutableMainExecutorSettings().SetMaxNumImages(1);
+  }
+
   if (main_backend_num_threads > 0) {
     auto cpu_config = settings->GetMutableMainExecutorSettings()
                           .MutableBackendConfig<litert::lm::CpuConfig>();
