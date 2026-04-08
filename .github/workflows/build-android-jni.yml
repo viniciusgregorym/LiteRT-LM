@@ -1,0 +1,46 @@
+name: "Build Android JNI"
+on:
+  push:
+    branches:
+      - fix-vision-max-num-images
+  workflow_dispatch:
+
+jobs:
+  build-android-arm64:
+    name: "Build litertlm_jni for Android ARM64"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Bazelisk
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+
+      - name: Install Android NDK r26d
+        run: |
+          wget -q https://dl.google.com/android/repository/android-ndk-r26d-linux.zip -O /tmp/ndk.zip
+          unzip -q /tmp/ndk.zip -d $HOME
+          echo "ANDROID_NDK_HOME=$HOME/android-ndk-r26d" >> $GITHUB_ENV
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@master
+        with:
+          toolchain: stable
+
+      - name: Build litertlm_jni for Android ARM64
+        run: |
+          bazel build --config=android_arm64 \
+            //kotlin/java/com/google/ai/edge/litertlm/jni:litertlm_jni
+
+      - name: Upload JNI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: litertlm-jni-android-arm64
+          path: bazel-bin/kotlin/java/com/google/ai/edge/litertlm/jni/liblitertlm_jni.so
