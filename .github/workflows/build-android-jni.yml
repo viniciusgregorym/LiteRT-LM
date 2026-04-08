@@ -20,19 +20,19 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
-          disk-cache: \${{ github.workflow }}
+          disk-cache: ${{ github.workflow }}
           repository-cache: true
 
       - name: Install Android NDK r28b
         run: |
           wget -q https://dl.google.com/android/repository/android-ndk-r28b-linux.zip -O /tmp/ndk.zip
           sudo unzip -q /tmp/ndk.zip -d /usr/local/lib/android/sdk/ndk/
-          echo "ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk/android-ndk-r28b" >> \$GITHUB_ENV
+          echo "ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk/android-ndk-r28b" >> $GITHUB_ENV
 
       - name: Install Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          echo "\$HOME/.cargo/bin" >> \$GITHUB_PATH
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Build JNI and Kotlin
         run: |
@@ -40,47 +40,19 @@ jobs:
             //kotlin/java/com/google/ai/edge/litertlm/jni:litertlm_jni \
             //kotlin/java/com/google/ai/edge/litertlm:litertlm-android
 
-      - name: Find outputs and package AAR
+      - name: Package AAR
         run: |
-          echo "=== Finding Kotlin output ==="
-          find bazel-bin/kotlin -name "*.jar" -o -name "*.aar" | head -20
-          
-          echo "=== Finding JNI output ==="
-          find bazel-bin/kotlin -name "*.so" | head -10
-          
           mkdir -p aar_build/jni/arm64-v8a
-          
-          # Copy JNI .so
           cp bazel-bin/kotlin/java/com/google/ai/edge/litertlm/jni/liblitertlm_jni.so aar_build/jni/arm64-v8a/
-          
-          # Copy prebuilt .so files
           cp prebuilt/android_arm64/libGemmaModelConstraintProvider.so aar_build/jni/arm64-v8a/
           cp prebuilt/android_arm64/libLiteRtGpuAccelerator.so aar_build/jni/arm64-v8a/
           cp prebuilt/android_arm64/libLiteRtOpenClAccelerator.so aar_build/jni/arm64-v8a/
           cp prebuilt/android_arm64/libLiteRtTopKOpenClSampler.so aar_build/jni/arm64-v8a/
-          
-          # Find and copy the Kotlin classes jar (try multiple possible names)
-          KOTLIN_JAR=\$(find bazel-bin/kotlin/java/com/google/ai/edge/litertlm -maxdepth 1 -name "*.jar" | head -1)
-          if [ -n "\$KOTLIN_JAR" ]; then
-            cp "\$KOTLIN_JAR" aar_build/classes.jar
-          else
-            echo "ERROR: No jar found!"
-            find bazel-bin/kotlin -name "*" -type f | head -30
-            exit 1
-          fi
-          
-          # Create AndroidManifest.xml
+          cp bazel-bin/kotlin/java/com/google/ai/edge/litertlm/liblitertlm-android.jar aar_build/classes.jar
           echo '<?xml version="1.0" encoding="utf-8"?>' > aar_build/AndroidManifest.xml
           echo '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.google.ai.edge.litertlm"/>' >> aar_build/AndroidManifest.xml
-          
-          # Create R.txt (empty)
           touch aar_build/R.txt
-          
-          # Package as AAR
           cd aar_build && zip -r ../litertlm-android-0.10.0-vision-fix.aar .
-          
-          echo "=== AAR contents ==="
-          unzip -l ../litertlm-android-0.10.0-vision-fix.aar
 
       - name: Upload AAR
         uses: actions/upload-artifact@v4
