@@ -34,25 +34,51 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - name: Build JNI and Kotlin
+      - name: Build JVM library (includes JNI)
         run: |
           bazel build --config=android_arm64 \
-            //kotlin/java/com/google/ai/edge/litertlm/jni:litertlm_jni \
-            //kotlin/java/com/google/ai/edge/litertlm:litertlm-android
+            //kotlin/java/com/google/ai/edge/litertlm:litertlm-jvm
 
       - name: Package AAR
         run: |
+          echo "=== Build outputs ==="
+          find bazel-bin/kotlin/java/com/google/ai/edge/litertlm -maxdepth 2 -name "*.jar" -exec ls -lh {} \;
+          
           mkdir -p aar_build/jni/arm64-v8a
-          cp bazel-bin/kotlin/java/com/google/ai/edge/litertlm/jni/liblitertlm_jni.so aar_build/jni/arm64-v8a/
+          
+          # The litertlm-jvm.jar has classes + JNI embedded as resource
+          cp bazel-bin/kotlin/java/com/google/ai/edge/litertlm/liblitertlm-jvm.jar aar_build/classes.jar
+          
+          # Also copy prebuilt shared libs needed at runtime
           cp prebuilt/android_arm64/libGemmaModelConstraintProvider.so aar_build/jni/arm64-v8a/
           cp prebuilt/android_arm64/libLiteRtGpuAccelerator.so aar_build/jni/arm64-v8a/
           cp prebuilt/android_arm64/libLiteRtOpenClAccelerator.so aar_build/jni/arm64-v8a/
           cp prebuilt/android_arm64/libLiteRtTopKOpenClSampler.so aar_build/jni/arm64-v8a/
-          cp bazel-bin/kotlin/java/com/google/ai/edge/litertlm/liblitertlm-android.jar aar_build/classes.jar
-          echo '<?xml version="1.0" encoding="utf-8"?>' > aar_build/AndroidManifest.xml
-          echo '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.google.ai.edge.litertlm"/>' >> aar_build/AndroidManifest.xml
-          touch aar_build/R.txt
-          cd aar_build && zip -r ../litertlm-android-0.10.0-vision-fix.aar .
+          
+          # Extract the JNI .so from the jar (it's embedded as resource)
+          cd aar_build
+          jar xf classes.jar com/google/ai/edge/litertlm/jni/liblitertlm_jni.so 2>/dev/null || true
+          if [ -f com/google/ai/edge/litertlm/jni/liblitertlm_jni.so ]; then
+            cp com/google/ai/edge/litertlm/jni/liblitertlm_jni.so jni/arm64-v8a/
+          fi
+          # Also try linux-aarch64 path
+          jar xf classes.jar com/google/ai/edge/litertlm/jni/linux-aarch64/liblitertlm_jni.so 2>/dev/null || true
+          if [ -f com/google/ai/edge/litertlm/jni/linux-aarch64/liblitertlm_jni.so ]; then
+            cp com/google/ai/edge/litertlm/jni/linux-aarch64/liblitertlm_jni.so jni/arm64-v8a/
+          fi
+          
+          # List what's in the jar
+          echo "=== JAR contents ==="
+          jar tf classes.jar | head -30
+          
+          echo "=== JNI dir ==="
+          ls -lh jni/arm64-v8a/
+          
+          echo '<?xml version="1.0" encoding="utf-8"?>' > AndroidManifest.xml
+          echo '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.google.ai.edge.litertlm"/>' >> AndroidManifest.xml
+          touch R.txt
+          
+          zip -r ../litertlm-android-0.10.0-vision-fix.aar .
 
       - name: Upload AAR
         uses: actions/upload-artifact@v4
